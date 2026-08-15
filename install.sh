@@ -9,7 +9,7 @@ export ZYPPER_NONINTERACTIVE=1
 detect_system_lang() {
     local sys_lang="${LANG:-}"
     [[ -z "$sys_lang" ]] && sys_lang="${LC_ALL:-${LC_MESSAGES:-}}"
-    if [[ "$sys_lang" == pl_PL* || "$sys_lang" == pl* ]]; then
+    if [[ "$sys_lang" == pl* ]]; then
         echo "pl"
     else
         echo "en"
@@ -34,6 +34,7 @@ printf '\033[?7l' >&3
 cleanup_on_exit() {
     local exit_code=$?
     printf '\033[?7h' >&3   # z powrotem włączamy zawijanie linii
+    [[ -n "${RPM_DIR:-}" && -d "$RPM_DIR" ]] && rm -rf "$RPM_DIR"
     if [ "$exit_code" -ne 0 ]; then
         echo -e "\n" >&3
         cp -f "$TMP_LOG" "$LOG_FILE" 2>/dev/null || true
@@ -111,7 +112,17 @@ if [[ "$EUID" -eq 0 ]]; then
 fi
 
 sudo -v
-echo "$CURRENT_USER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/99-temp-installer > /dev/null
+SUDOERS_TMP="$(mktemp)"
+echo "$CURRENT_USER ALL=(ALL) NOPASSWD: ALL" > "$SUDOERS_TMP"
+chmod 0440 "$SUDOERS_TMP"
+if sudo visudo -cf "$SUDOERS_TMP" &>/dev/null; then
+    sudo install -m 0440 -o root -g root "$SUDOERS_TMP" /etc/sudoers.d/99-temp-installer
+else
+    rm -f "$SUDOERS_TMP"
+    echo -e "${ERROR}✘ Nieprawidłowa składnia pliku sudoers – przerywam.${NC}" >&3
+    exit 1
+fi
+rm -f "$SUDOERS_TMP"
 
 # ==========================================================
 #  ETAP 1/3: KONFIGURACJA REPOZYTORIÓW I OPTYMALIZACJA SYSTEMU
@@ -305,9 +316,14 @@ rm -rf "$RPM_DIR"
 
 show_progress 7 $TOTAL_STEPS "$MSG_PHASE_2"
 
+pkg_available() {
+    # Sprawdza dostępność pakietu w repozytoriach (nie tylko czy jest już zainstalowany)
+    sudo zypper --non-interactive install --dry-run "$1" &>/dev/null
+}
+
 QEMU_PKG=""
 for candidate in qemu-kvm qemu-x86 qemu; do
-    if sudo zypper search -x "$candidate" 2>/dev/null | grep -q "^i\|^v"; then
+    if pkg_available "$candidate"; then
         QEMU_PKG="$candidate"
         break
     fi
@@ -315,14 +331,17 @@ done
 [[ -z "$QEMU_PKG" ]] && QEMU_PKG="qemu-x86"
 
 OVMF_PKG=""
-for candidate in ovmf edk2-ovmf; do
-    if sudo zypper search -x "$candidate" 2>/dev/null | grep -q "^i\|^v"; then
+for candidate in qemu-ovmf-x86_64 ovmf edk2-ovmf; do
+    if pkg_available "$candidate"; then
         OVMF_PKG="$candidate"
         break
     fi
 done
 
-sudo zypper install -y --allow-vendor-change virt-manager "$QEMU_PKG" qemu-tools libvirt libvirt-daemon-qemu "$OVMF_PKG" 2>/dev/null || true
+VIRT_PACKAGES=(virt-manager "$QEMU_PKG" qemu-tools libvirt libvirt-daemon-qemu)
+[[ -n "$OVMF_PKG" ]] && VIRT_PACKAGES+=("$OVMF_PKG")
+
+sudo zypper install -y --allow-vendor-change "${VIRT_PACKAGES[@]}" 2>/dev/null || true
 
 for svc in libvirtd virtqemud; do
     if systemctl list-unit-files "${svc}.service" 2>/dev/null | grep -q "$svc"; then
@@ -367,8 +386,12 @@ show_progress 9 $TOTAL_STEPS "$MSG_PHASE_3"
 mkdir -p ~/.config
 if [[ -f ~/.config/kwalletrc ]]; then
     if grep -q "^\[Wallet\]" ~/.config/kwalletrc; then
+        # Wyciągamy TYLKO sekcję [Wallet], żeby sprawdzić czy zawiera własną linię Enabled=
+        WALLET_SECTION="$(awk '/^\[Wallet\]/{f=1;next} /^\[/{f=0} f' ~/.config/kwalletrc)"
         sed -i '/^\[Wallet\]/,/^\[/{s/^Enabled=.*/Enabled=false/}' ~/.config/kwalletrc
-        grep -q "^Enabled=" ~/.config/kwalletrc || sed -i '/^\[Wallet\]/a Enabled=false' ~/.config/kwalletrc
+        if ! echo "$WALLET_SECTION" | grep -q "^Enabled="; then
+            sed -i '/^\[Wallet\]/a Enabled=false' ~/.config/kwalletrc
+        fi
     else
         printf '[Wallet]\nEnabled=false\n' >> ~/.config/kwalletrc
     fi
@@ -436,7 +459,8 @@ if [[ -n "$ZSH_BIN" ]]; then
     if [[ -f "$ZSHRC" ]]; then
         sed -i 's|^ZSH_THEME=.*|ZSH_THEME="powerlevel10k/powerlevel10k"|' "$ZSHRC" || true
         sed -i 's/^plugins=(.*/plugins=(git sudo systemd suse zsh-autosuggestions zsh-syntax-highlighting)/' "$ZSHRC" || true
-        grep -q "LC_ALL=pl_PL.UTF-8" "$ZSHRC" || echo "export LC_ALL=pl_PL.UTF-8" >> "$ZSHRC"
+        SHELL_LOCALE="${LANG:-${LC_ALL:-${LC_MESSAGES:-en_US.UTF-8}}}"
+        grep -q "^export LC_ALL=" "$ZSHRC" || echo "export LC_ALL=${SHELL_LOCALE}" >> "$ZSHRC"
         grep -q "^fastfetch"          "$ZSHRC" || echo "fastfetch"                  >> "$ZSHRC"
     fi
 fi
