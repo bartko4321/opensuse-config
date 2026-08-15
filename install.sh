@@ -6,7 +6,6 @@
 set -euo pipefail
 export ZYPPER_NONINTERACTIVE=1
 
-# ── Wykrywanie języka systemu ──────────────────────────────────
 detect_system_lang() {
     local sys_lang="${LANG:-}"
     [[ -z "$sys_lang" ]] && sys_lang="${LC_ALL:-${LC_MESSAGES:-}}"
@@ -18,26 +17,18 @@ detect_system_lang() {
 }
 SCRIPT_LANG="$(detect_system_lang)"
 
-# ── Kolory ────────────────────────────────────────────────────
 INFO='\033[0;34m'
 SUCCESS='\033[0;32m'
 ERROR='\033[0;31m'
 WARN='\033[0;33m'
 NC='\033[0m'
 
-# ── System logowania i ukrywanie komunikatów ──────────────────
 TMP_LOG="$(mktemp /tmp/opensuse-install-log.XXXXXX)"
 LOG_FILE="$HOME/install_error_$(date +%Y%m%d_%H%M%S).log"
 
-# fd 3 = terminal (używany WYŁĄCZNIE dla paska postępu i pytań)
-# fd 1/2 (stdout/stderr) lądują w tle w pliku tymczasowym.
 exec 3>&1
 exec >>"$TMP_LOG" 2>&1
 
-# Wyłączamy zawijanie linii w terminalu na czas działania skryptu.
-# Bez tego zbyt długa linia paska postępu (pasek + komunikat) zawija się
-# na dwa wiersze terminala, a \r\033[K czyści tylko ten, na którym stoi
-# kursor — w efekcie na ekranie zostają "resztki" poprzedniego komunikatu.
 printf '\033[?7l' >&3
 
 cleanup_on_exit() {
@@ -56,7 +47,6 @@ cleanup_on_exit() {
 }
 trap cleanup_on_exit EXIT
 
-# Funkcje logujące wyłącznie w tle
 _pick_msg() { [[ "$SCRIPT_LANG" == "pl" ]] && echo "$1" || echo "$2"; }
 log_info()  { local m; m="$(_pick_msg "$1" "$2")"; echo -e "${INFO}==> $m${NC}"; }
 log_ok()    { local m; m="$(_pick_msg "$1" "$2")"; echo -e "${SUCCESS}✔ $m${NC}"; }
@@ -65,29 +55,23 @@ log_warn()  { local m; m="$(_pick_msg "$1" "$2")"; echo -e "${WARN}⚠ WARN: $m$
 
 trap 'log_err "Błąd w linii $LINENO. Polecenie: $BASH_COMMAND" "Error at line $LINENO. Command: $BASH_COMMAND"' ERR
 
-# ── Funkcja rysująca pasek postępu ─────────────────────────────
 show_progress() {
     local step=$1
     local total=$2
     local msg=$3
     local percent=$(( step * 100 / total ))
 
-    # Szerokość terminala (fallback 80, gdyby tput się nie powiódł)
     local cols
     cols=$(tput cols 2>/dev/null)
     [[ "$cols" =~ ^[0-9]+$ ]] || cols=80
 
-    # Pasek ma maks. 50 znaków, ale kurczy się, jeśli terminal jest węższy.
     local bar_width=50
-    local reserved=12   # "[" + "]" + " 100% | " + margines bezpieczeństwa
+    local reserved=12
     if (( cols - reserved < bar_width )); then
         bar_width=$(( cols - reserved ))
         (( bar_width < 10 )) && bar_width=10
     fi
 
-    # Komunikat obcinamy tak, by cała linia zmieściła się w jednym wierszu
-    # terminala — dzięki temu \r\033[K zawsze czyści CAŁĄ poprzednią treść,
-    # zamiast zostawiać resztki po zawiniętej linii.
     local overhead=$(( bar_width + reserved ))
     local avail=$(( cols - overhead ))
     if (( avail < 5 )); then avail=5; fi
@@ -106,7 +90,6 @@ show_progress() {
     printf "\r\033[K[\033[1;32m%s\033[0;90m%s\033[0m] %3d%% | \033[1;36m%s\033[0m" "$bar_filled" "$bar_empty" "$percent" "$msg" >&3
 }
 
-# ── 3 GŁÓWNE KOMUNIKATY ────────────────────────────────────────
 if [[ "$SCRIPT_LANG" == "pl" ]]; then
     MSG_PHASE_1="[1/3] Konfiguracja repozytoriów i optymalizacja systemu..."
     MSG_PHASE_2="[2/3] Instalacja pakietów systemowych, bibliotek 32-bit i Flatpak..."
@@ -122,13 +105,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 CURRENT_USER=$(whoami)
 RPM_DIR="$(mktemp -d /tmp/rpm_install_XXXXXX)"
 
-# Sprawdzenie uprawnień
 if [[ "$EUID" -eq 0 ]]; then
     echo -e "${ERROR}✘ Nie uruchamiaj skryptu jako root. Uruchom jako zwykły użytkownik z uprawnieniami sudo.${NC}" >&3
     exit 1
 fi
 
-# Tymczasowy wyjątek sudo dla Zypper/RPM
 sudo -v
 echo "$CURRENT_USER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/99-temp-installer > /dev/null
 
@@ -161,7 +142,6 @@ sudo zypper install -y curl wget pciutils gpg2
 
 show_progress 2 $TOTAL_STEPS "$MSG_PHASE_1"
 
-# Dodawanie repozytoriów
 sudo zypper addrepo -cfp 90 https://ftp.gwdg.de/pub/linux/misc/packman/suse/openSUSE_Tumbleweed/ packman || true
 sudo rpm --import https://ftp.gwdg.de/pub/linux/misc/packman/suse/openSUSE_Tumbleweed/repodata/repomd.xml.key 2>/dev/null || true
 
@@ -461,7 +441,6 @@ if [[ -n "$ZSH_BIN" ]]; then
     fi
 fi
 
-# Zakończenie
 sudo rm -f /etc/sudoers.d/99-temp-installer
 
 show_progress 12 $TOTAL_STEPS "$MSG_PHASE_3"
