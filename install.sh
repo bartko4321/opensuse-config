@@ -19,8 +19,8 @@ SCRIPT_LANG="$(detect_system_lang)"
 
 INFO='\033[0;34m'
 SUCCESS='\033[0;32m'
-ERROR='\033[0;31m'
 WARN='\033[0;33m'
+ERR='\033[0;31m'
 NC='\033[0m'
 
 TMP_LOG="$(mktemp /tmp/opensuse-install-log.XXXXXX)"
@@ -29,11 +29,9 @@ LOG_FILE="$HOME/install_error_$(date +%Y%m%d_%H%M%S).log"
 exec 3>&1
 exec >>"$TMP_LOG" 2>&1
 
-printf '\033[?7l' >&3
-
 cleanup_on_exit() {
     local exit_code=$?
-    printf '\033[?7h' >&3   # z powrotem włączamy zawijanie linii
+    printf '\033[?7h' >&3
     [[ -n "${RPM_DIR:-}" && -d "$RPM_DIR" ]] && rm -rf "$RPM_DIR"
     if [ "$exit_code" -ne 0 ]; then
         echo -e "\n" >&3
@@ -51,7 +49,7 @@ trap cleanup_on_exit EXIT
 _pick_msg() { [[ "$SCRIPT_LANG" == "pl" ]] && echo "$1" || echo "$2"; }
 log_info()  { local m; m="$(_pick_msg "$1" "$2")"; echo -e "${INFO}==> $m${NC}"; }
 log_ok()    { local m; m="$(_pick_msg "$1" "$2")"; echo -e "${SUCCESS}✔ $m${NC}"; }
-log_err()   { local m; m="$(_pick_msg "$1" "$2")"; echo -e "${ERROR}✘ ERROR: $m${NC}"; }
+log_err()   { local m; m="$(_pick_msg "$1" "$2")"; echo -e "${ERR}✘ ERROR: $m${NC}"; }
 log_warn()  { local m; m="$(_pick_msg "$1" "$2")"; echo -e "${WARN}⚠ WARN: $m${NC}"; }
 
 trap 'log_err "Błąd w linii $LINENO. Polecenie: $BASH_COMMAND" "Error at line $LINENO. Command: $BASH_COMMAND"' ERR
@@ -111,6 +109,7 @@ if [[ "$EUID" -eq 0 ]]; then
     exit 1
 fi
 
+printf '\033[?7h\n' >&3
 sudo -v
 SUDOERS_TMP="$(mktemp)"
 echo "$CURRENT_USER ALL=(ALL) NOPASSWD: ALL" > "$SUDOERS_TMP"
@@ -123,6 +122,8 @@ else
     exit 1
 fi
 rm -f "$SUDOERS_TMP"
+
+printf '\033[?7l' >&3
 
 # ==========================================================
 #  ETAP 1/3: KONFIGURACJA REPOZYTORIÓW I OPTYMALIZACJA SYSTEMU
@@ -267,12 +268,9 @@ if (( GPU_HAS_INTEL )); then
 fi
 
 if (( GPU_VENDOR_COUNT > 0 )); then
-    # usuń ewentualne duplikaty w PACKAGES_32
     readarray -t PACKAGES_32 < <(printf '%s\n' "${PACKAGES_32[@]}" | awk '!seen[$0]++')
     echo "force_drivers+=\"${FORCE_DRIVERS} \"" | sudo tee "$DRACUT_CONF" > /dev/null
 else
-    # GPU nieznane/niewykryte -> instalujemy generyczne sterowniki mesa 32-bit
-    # (odpowiednik pakietu "lib32-mesa" z Arch Linuksa w świecie openSUSE)
     PACKAGES_32+=("${MESA_32_PKGS[@]}")
     sudo rm -f "$DRACUT_CONF"
 fi
@@ -343,7 +341,6 @@ rm -rf "$RPM_DIR"
 show_progress 7 $TOTAL_STEPS "$MSG_PHASE_2"
 
 pkg_available() {
-    # Sprawdza dostępność pakietu w repozytoriach (nie tylko czy jest już zainstalowany)
     sudo zypper --non-interactive install --dry-run "$1" &>/dev/null
 }
 
@@ -412,7 +409,6 @@ show_progress 9 $TOTAL_STEPS "$MSG_PHASE_3"
 mkdir -p ~/.config
 if [[ -f ~/.config/kwalletrc ]]; then
     if grep -q "^\[Wallet\]" ~/.config/kwalletrc; then
-        # Wyciągamy TYLKO sekcję [Wallet], żeby sprawdzić czy zawiera własną linię Enabled=
         WALLET_SECTION="$(awk '/^\[Wallet\]/{f=1;next} /^\[/{f=0} f' ~/.config/kwalletrc)"
         sed -i '/^\[Wallet\]/,/^\[/{s/^Enabled=.*/Enabled=false/}' ~/.config/kwalletrc
         if ! echo "$WALLET_SECTION" | grep -q "^Enabled="; then
