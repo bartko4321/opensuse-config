@@ -37,9 +37,9 @@ cleanup_on_exit() {
         echo -e "\n" >&3
         cp -f "$TMP_LOG" "$LOG_FILE" 2>/dev/null || true
         if [[ "$SCRIPT_LANG" == "pl" ]]; then
-            echo -e "${ERROR}✘ Wystąpił błąd (kod: $exit_code). Szczegółowy log zapisano w: $LOG_FILE${NC}" >&3
+            echo -e "${ERR}✘ Wystąpił błąd (kod: $exit_code). Szczegółowy log zapisano w: $LOG_FILE${NC}" >&3
         else
-            echo -e "${ERROR}✘ An error occurred (code: $exit_code). Detailed log saved to: $LOG_FILE${NC}" >&3
+            echo -e "${ERR}✘ An error occurred (code: $exit_code). Detailed log saved to: $LOG_FILE${NC}" >&3
         fi
     fi
     rm -f "$TMP_LOG"
@@ -105,7 +105,7 @@ CURRENT_USER=$(whoami)
 RPM_DIR="$(mktemp -d /tmp/rpm_install_XXXXXX)"
 
 if [[ "$EUID" -eq 0 ]]; then
-    echo -e "${ERROR}✘ Nie uruchamiaj skryptu jako root. Uruchom jako zwykły użytkownik z uprawnieniami sudo.${NC}" >&3
+    echo -e "${ERR}✘ Nie uruchamiaj skryptu jako root. Uruchom jako zwykły użytkownik z uprawnieniami sudo.${NC}" >&3
     exit 1
 fi
 
@@ -118,7 +118,7 @@ if sudo visudo -cf "$SUDOERS_TMP" &>/dev/null; then
     sudo install -m 0440 -o root -g root "$SUDOERS_TMP" /etc/sudoers.d/99-temp-installer
 else
     rm -f "$SUDOERS_TMP"
-    echo -e "${ERROR}✘ Nieprawidłowa składnia pliku sudoers – przerywam.${NC}" >&3
+    echo -e "${ERR}✘ Nieprawidłowa składnia pliku sudoers – przerywam.${NC}" >&3
     exit 1
 fi
 rm -f "$SUDOERS_TMP"
