@@ -194,10 +194,9 @@ TO_REMOVE=(
     nano konqueror plasma-browser-integration plasma-vault
     plasma-thunderbolt kontact kmail kontrast krdp krfb
     kaddressbook kdepim-runtime akonadi-server akregator
-    epiphany decibels rhythmbox korganizer
-    showtime cosmic-player parole kwalletmanager
-    gnome-calendar gnome-clocks gnome-music gnome-user-docs gnome-contacts
-    gnome-maps gnome-weather loupe papers gnome-text-editor yelp
+    epiphany decibels korganizer kwalletmanager
+    gnome-calendar gnome-clocks gnome-user-docs gnome-contacts
+    gnome-maps gnome-weather yelp
 )
 for pkg in "${TO_REMOVE[@]}"; do
     if rpm -q "$pkg" &>/dev/null; then
@@ -216,7 +215,7 @@ sudo zypper install -y brave-origin || true
 
 PACKAGES=(
     dconf-editor fastfetch unrar git mc android-tools pv zenity innoextract
-    elisa audacity vlc gimp gmic mixxx kdenlive kolourpaint soundconverter handbrake-gui
+    audacity gimp gmic mixxx kdenlive kolourpaint soundconverter handbrake-gui
     telegram-desktop qbittorrent thunderbird MozillaThunderbird-translations-common
     bleachbit makeself vim cdemu-daemon cdemu-client
     gamemode gamescope mangohud goverlay libvkd3d1 wine-staging wine-mono wine-gecko
