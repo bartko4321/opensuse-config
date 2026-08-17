@@ -150,7 +150,9 @@ show_progress 1 $TOTAL_STEPS "$MSG_PHASE_1"
 sudo systemctl stop packagekit.service 2>/dev/null || true
 sudo killall -9 packagekitd 2>/dev/null || true
 
-sudo zypper install -y curl wget pciutils gpg2
+for pkg in curl wget pciutils gpg2; do
+    sudo zypper install -y "$pkg" || true
+done
 
 show_progress 2 $TOTAL_STEPS "$MSG_PHASE_1"
 
@@ -182,8 +184,8 @@ fi
 
 sudo zypper addrepo https://brave-browser-rpm-release.s3.brave.com/brave-browser.repo || true
 
-sudo zypper --gpg-auto-import-keys refresh
-sudo zypper dup -y --allow-vendor-change
+sudo zypper --gpg-auto-import-keys refresh || true
+sudo zypper dup -y --allow-vendor-change || true
 
 show_progress 3 $TOTAL_STEPS "$MSG_PHASE_1"
 
@@ -194,6 +196,8 @@ TO_REMOVE=(
     kaddressbook kdepim-runtime akonadi-server akregator
     epiphany decibels rhythmbox korganizer
     showtime cosmic-player parole kwalletmanager
+    gnome-calendar gnome-clocks gnome-music gnome-user-docs gnome-contacts
+    gnome-maps gnome-weather loupe papers gnome-text-editor yelp
 )
 for pkg in "${TO_REMOVE[@]}"; do
     if rpm -q "$pkg" &>/dev/null; then
