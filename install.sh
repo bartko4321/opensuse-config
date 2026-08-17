@@ -190,7 +190,7 @@ sudo zypper dup -y --allow-vendor-change || true
 show_progress 3 $TOTAL_STEPS "$MSG_PHASE_1"
 
 TO_REMOVE=(
-    opensuse-welcome-launcher plasma-welcome imagemagick
+    opensuse-welcome-launcher plasma-welcome
     nano konqueror plasma-browser-integration plasma-vault
     plasma-thunderbolt kontact kmail kontrast krdp krfb
     kaddressbook kdepim-runtime akonadi-server akregator
