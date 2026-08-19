@@ -44,7 +44,7 @@ Run the following commands in your terminal:
 
 # 1. Clone your repository
 ```bash
-git clone https://github.com/bartko4321/opensuse-config.git
+git clone https://github.com/syscore88/opensuse-config.git
 ```
 
 
