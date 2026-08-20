@@ -196,7 +196,8 @@ TO_REMOVE=(
     kaddressbook kdepim-runtime akonadi-server akregator
     epiphany decibels korganizer kwalletmanager
     gnome-calendar gnome-clocks gnome-user-docs gnome-contacts
-    gnome-maps gnome-weather yelp
+    gnome-maps gnome-weather yelp evolution evolution-common
+    evolution-plugins evolution-ews
 )
 for pkg in "${TO_REMOVE[@]}"; do
     if rpm -q "$pkg" &>/dev/null; then
@@ -208,9 +209,9 @@ sudo zypper autoremove -y 2>/dev/null || true
 rm -rf ~/.local/share/akonadi ~/.local/share/kmail2 ~/.local/share/local-mail ~/.local/share/contacts ~/.local/share/korganizer ~/.local/share/akregator ~/.local/share/kontact ~/.local/share/konqueror
 rm -rf ~/.config/akonadi* ~/.config/kmail* ~/.config/kontact* ~/.config/korganizer* ~/.config/kaddressbook* ~/.config/akregator* ~/.config/emailidentities ~/.config/mailtransports
 rm -rf ~/.cache/akonadi* ~/.cache/kmail* ~/.cache/kontact* ~/.cache/korganizer* ~/.cache/kaddressbook* ~/.cache/akregator* ~/.cache/konqueror*
-rm -rf ~/.local/share/{epiphany,decibels,gnome-user-docs,gnome-contacts,gnome-maps,gnome-weather}
-rm -rf ~/.config/{epiphany,decibels,gnome-user-docs,gnome-contacts,gnome-maps,gnome-weather}
-rm -rf ~/.cache/{epiphany,decibels,gnome-user-docs,gnome-contacts,gnome-maps,gnome-weather}
+rm -rf ~/.local/share/{epiphany,decibels,gnome-user-docs,gnome-contacts,gnome-maps,gnome-weather,evolution}
+rm -rf ~/.config/{epiphany,decibels,gnome-user-docs,gnome-contacts,gnome-maps,gnome-weather,evolution}
+rm -rf ~/.cache/{epiphany,decibels,gnome-user-docs,gnome-contacts,gnome-maps,gnome-weather,evolution}
 
 # ==========================================================
 #  ETAP 2/3: INSTALACJA PAKIETÓW, BIBLIOTEK 32-BIT I FLATPAK
