@@ -1,15 +1,11 @@
 #!/bin/bash
 
-# Kolory dla lepszej czytelności / Colors for better readability
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# =========================================================
-# WYKRYWANIE JĘZYKA SYSTEMU / SYSTEM LANGUAGE DETECTION
-# =========================================================
 DETECTED_LOCALE="${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}"
 if [ -z "$DETECTED_LOCALE" ] && command -v locale &> /dev/null; then
     DETECTED_LOCALE=$(locale 2>/dev/null | grep -m1 '^LANG=' | cut -d= -f2)
@@ -21,9 +17,6 @@ else
     IS_PL=false
 fi
 
-# =========================================================
-# KOMUNIKATY / MESSAGES
-# =========================================================
 if [ "$IS_PL" = true ]; then
     MSG_TITLE="       KOMPLEKSOWY SKRYPT AKTUALIZACJI I CZYSZCZENIA  "
     MSG_ASK_PASS="Proszę podać hasło administratora (sudo):"
@@ -124,16 +117,13 @@ echo -e "${BLUE}======================================================${NC}"
 echo -e "${BLUE}${MSG_TITLE}${NC}"
 echo -e "${BLUE}======================================================${NC}"
 
-# Zapytanie o hasło administratora (TYLKO RAZ) / Ask for the admin password (ONCE ONLY)
 echo -e "${YELLOW}${MSG_ASK_PASS}${NC}"
 sudo -v
 
-# Utrzymanie aktywnej sesji sudo w tle / Keep the sudo session alive in the background
 while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 SUDO_KEEP_ALIVE_PID=$!
 trap 'kill $SUDO_KEEP_ALIVE_PID 2>/dev/null' EXIT
 
-# Rozpoznawanie konkretnej wersji openSUSE / Detecting the specific openSUSE version
 OS_ID=$(grep "^ID=" /etc/os-release | cut -d'=' -f2 | tr -d '"')
 
 if [ "$OS_ID" == "opensuse-tumbleweed" ]; then
@@ -149,7 +139,6 @@ echo -e "\n${BLUE}======================================================${NC}"
 echo -e "${BLUE}${MSG_PHASE1_TITLE}${NC}"
 echo -e "${BLUE}======================================================${NC}"
 
-# 1. Pełna aktualizacja systemu / Full system update
 if [ "$OS_NAME" == "Tumbleweed" ]; then
     echo -e "${GREEN}${MSG_DUP_TUMBLEWEED}${NC}"
     sudo zypper dup --no-allow-vendor-change --auto-agree-with-licenses
@@ -158,7 +147,6 @@ else
     sudo zypper up --auto-agree-with-licenses
 fi
 
-# 1a. Aktualizacja firmware / Firmware update
 FWUPD_RESTART_NEEDED=false
 if command -v fwupdmgr &> /dev/null; then
     echo -e "${GREEN}${MSG_FWUPD_REFRESH}${NC}"
@@ -175,7 +163,6 @@ else
     echo -e "${YELLOW}${MSG_FWUPD_ABSENT}${NC}"
 fi
 
-# 2. Czyszczenie osieroconych pakietów (bezpieczny tryb interaktywny) / Cleaning orphaned packages (safe interactive mode)
 echo -e "${GREEN}${MSG_CHECK_ORPHANS}${NC}"
 ORPHANS=$(zypper packages --unneeded | awk -F'|' 'NR>4 {gsub(/ /, "", $3); print $3}' | grep -v '^$')
 if [ -n "$ORPHANS" ]; then
@@ -189,7 +176,6 @@ if [ -n "$ORPHANS" ]; then
     read -rp "$(echo -e "${YELLOW}${MSG_ORPHAN_CONFIRM_PROMPT}${NC}")" CONFIRM
     if [ "$CONFIRM" == "$MSG_ORPHAN_CONFIRM_WORD" ]; then
         echo -e "${GREEN}${MSG_REMOVING_ORPHANS}${NC}"
-        # shellcheck disable=SC2086
         sudo zypper rm $ORPHANS
     else
         echo -e "${GREEN}${MSG_SKIPPED_ORPHANS}${NC}"
@@ -198,7 +184,6 @@ else
     echo "$MSG_NO_ORPHANS"
 fi
 
-# 3. Repozytoria i Cache Zyppera / Zypper repos and cache
 echo -e "${GREEN}${MSG_REMOVE_UNUSED_REPOS}${NC}"
 REPOS_TO_REMOVE=$(zypper lr | awk -F'|' '$4 ~ /No/ {print $2}' | xargs)
 if [ -n "$REPOS_TO_REMOVE" ]; then
@@ -210,7 +195,6 @@ fi
 echo -e "${GREEN}${MSG_CLEAN_ZYPPER_CACHE}${NC}"
 sudo zypper clean -a
 
-# 4. Aktualizacja i kompleksowe czyszczenie Flatpak (System) / Updating and cleaning up Flatpak (System)
 if command -v flatpak &> /dev/null; then
     echo -e "${GREEN}${MSG_FLATPAK_UPDATE_SYS}${NC}"
     sudo flatpak update --system -y
@@ -219,7 +203,6 @@ if command -v flatpak &> /dev/null; then
     sudo flatpak uninstall --unused --system --delete-data -y
     sudo flatpak repair --system
 
-    # Usuwanie nieużywanych źródeł (remotes) / Removing unused remotes
     USED_REMOTES=$(flatpak list --system --columns=origin 2>/dev/null | sort -u)
     ALL_REMOTES=$(flatpak remotes --system --columns=name 2>/dev/null | tail -n +1)
 
@@ -230,12 +213,10 @@ if command -v flatpak &> /dev/null; then
         fi
     done <<< "$ALL_REMOTES"
 
-    # Czyszczenie śmieci Flatpak / Cleaning up Flatpak leftovers
     sudo rm -rf /var/tmp/flatpak-cache-* 2>/dev/null
     sudo find /var/lib/flatpak -name "*.tmp" -delete 2>/dev/null
     sudo rm -f /var/lib/flatpak/history 2>/dev/null
 
-    # Inteligentne czyszczenie /var/app / Smart /var/app cleanup
     echo -e "${GREEN}${MSG_FLATPAK_CLEAN_VARAPP_SYS}${NC}"
     INSTALLED_FLATPAKS=$(flatpak list --app --columns=application 2>/dev/null)
     if [ -d "/var/app" ]; then
@@ -251,7 +232,6 @@ if command -v flatpak &> /dev/null; then
     fi
 fi
 
-# 5. Logi, stare kernele i stare pliki tymczasowe / Logs, old kernels and old temp files
 echo -e "${GREEN}${MSG_CLEAN_LOGS}${NC}"
 sudo journalctl --vacuum-time=7d
 
@@ -262,12 +242,10 @@ echo -e "${GREEN}${MSG_CLEAN_TMP}${NC}"
 sudo find /tmp -type f -atime +3 -delete 2>/dev/null
 sudo find /var/tmp -type f -atime +3 -delete 2>/dev/null
 
-
 echo -e "\n${BLUE}======================================================${NC}"
 echo -e "${BLUE}${MSG_PHASE2_TITLE}${NC}"
 echo -e "${BLUE}======================================================${NC}"
 
-# 1. Aktualizacja i kompleksowe czyszczenie Flatpak (Użytkownik) / Updating and cleaning up Flatpak (User)
 if command -v flatpak &> /dev/null; then
     echo -e "${GREEN}${MSG_FLATPAK_UPDATE_USER}${NC}"
     flatpak update --user -y
@@ -276,11 +254,9 @@ if command -v flatpak &> /dev/null; then
     flatpak uninstall --unused --user --delete-data -y
     flatpak repair --user
 
-    # Czyszczenie historii i repozytoriów tymczasowych / Cleaning history and temp repos
     rm -f ~/.local/share/flatpak/history 2>/dev/null
     rm -rf ~/.local/share/flatpak/repo/tmp/* 2>/dev/null
 
-    # Inteligentne czyszczenie ~/.var/app / Smart ~/.var/app cleanup
     echo -e "${GREEN}${MSG_FLATPAK_CLEAN_VARAPP_USER}${NC}"
     INSTALLED_FLATPAKS=$(flatpak list --app --columns=application 2>/dev/null)
     if [ -d "$HOME/.var/app" ]; then
@@ -296,7 +272,6 @@ if command -v flatpak &> /dev/null; then
     fi
 fi
 
-# 2. Czyszczenie starych miniatur i cache / Cleaning old thumbnails and cache
 echo -e "${GREEN}${MSG_CLEAN_THUMBS}${NC}"
 find ~/.cache/thumbnails -type f -atime +7 -delete 2>/dev/null
 
@@ -310,7 +285,6 @@ find ~/.cache -type f -atime +14 \
     ! -path "*/vivaldi/*" \
     -delete 2>/dev/null
 
-# 3. Czyszczenie virt-manager i dconf / Cleaning virt-manager and dconf
 echo -e "${GREEN}${MSG_CLEAN_VIRT}${NC}"
 USER_ID=$(id -u)
 if [ -S "/run/user/$USER_ID/bus" ]; then
@@ -318,7 +292,6 @@ if [ -S "/run/user/$USER_ID/bus" ]; then
 fi
 rm -rf "$HOME/.cache/virt-manager" 2>/dev/null
 
-# 4. Czcionki / Fonts
 echo -e "${GREEN}${MSG_REBUILD_FONTS}${NC}"
 fc-cache -r
 
@@ -326,8 +299,6 @@ echo -e "\n${BLUE}======================================================${NC}"
 echo -e "${BLUE}${MSG_PHASE3_TITLE}${NC}"
 echo -e "${BLUE}======================================================${NC}"
 
-# zypper ps sprawdza procesy używające usuniętych plików (po aktualizacji)
-# zypper ps checks for processes using deleted files (after the update)
 echo -e "${GREEN}${MSG_CHECK_RESTART}${NC}"
 if sudo zypper ps 2>/dev/null | grep -iq "reboot is required"; then
     echo -e "\n${RED}******************************************************${NC}"
