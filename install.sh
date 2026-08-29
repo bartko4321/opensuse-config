@@ -417,21 +417,6 @@ flatpak install --user -y flathub it.mijorus.gearlever 2>/dev/null || true
 # ==========================================================
 show_progress 9 $TOTAL_STEPS "$MSG_PHASE_3"
 
-mkdir -p ~/.config
-if [[ -f ~/.config/kwalletrc ]]; then
-    if grep -q "^\[Wallet\]" ~/.config/kwalletrc; then
-        WALLET_SECTION="$(awk '/^\[Wallet\]/{f=1;next} /^\[/{f=0} f' ~/.config/kwalletrc)"
-        sed -i '/^\[Wallet\]/,/^\[/{s/^Enabled=.*/Enabled=false/}' ~/.config/kwalletrc
-        if ! echo "$WALLET_SECTION" | grep -q "^Enabled="; then
-            sed -i '/^\[Wallet\]/a Enabled=false' ~/.config/kwalletrc
-        fi
-    else
-        printf '[Wallet]\nEnabled=false\n' >> ~/.config/kwalletrc
-    fi
-else
-    printf '[Wallet]\nEnabled=false\n' > ~/.config/kwalletrc
-fi
-
 if [[ -d "$SCRIPT_DIR/bleachbit" ]]; then
     sudo mkdir -p /root/.config/bleachbit
     sudo cp -af "$SCRIPT_DIR/bleachbit/." /root/.config/bleachbit/
