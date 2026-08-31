@@ -117,34 +117,29 @@ if [[ -z "$CURRENT_USER" ]]; then
     exit 1
 fi
 
-# Na części instalacji openSUSE Tumbleweed "sudo" to w rzeczywistości
-# run0-sudo (wrapper systemd na run0), który NIE zawiera visudo i nie
-# obsługuje "sudo -v". Upewniamy się, że mamy prawdziwy pakiet "sudo".
+RUN0_NOPASSWD_FILE="/etc/polkit-1/rules.d/51-run0-nopasswd.rules"
+USE_RUN0=0
 if ! command -v visudo >/dev/null 2>&1 || sudo --version 2>/dev/null | grep -qi "run0"; then
-    echo -e "${WARN}⚠ Wykryto brak prawdziwego pakietu 'sudo' (używany jest wrapper run0). Instaluję pakiet 'sudo'...${NC}" >&3
-    sudo zypper install -y sudo
-    hash -r
-fi
-
-if ! command -v visudo >/dev/null 2>&1; then
-    echo -e "${ERR}✘ Nie udało się znaleźć/zainstalować 'visudo'. Zainstaluj ręcznie: sudo zypper install sudo${NC}" >&3
-    exit 1
+    USE_RUN0=1
 fi
 
 sudo -v
 
-SUDOERS_TMP="$(mktemp)"
-printf '%s ALL=(ALL:ALL) NOPASSWD: ALL\n' "$CURRENT_USER" > "$SUDOERS_TMP"
-
-VISUDO_ERR="$(sudo visudo -cf "$SUDOERS_TMP" 2>&1)"
-if [[ $? -eq 0 ]]; then
-    sudo install -m 0440 -o root -g root "$SUDOERS_TMP" /etc/sudoers.d/99-temp-installer
-    rm -f "$SUDOERS_TMP"
+if [[ "$USE_RUN0" -eq 1 ]]; then
+    printf 'polkit._run0_nopasswd.push("%s");\n' "$CURRENT_USER" | sudo tee "$RUN0_NOPASSWD_FILE" > /dev/null
+    sudo systemctl try-restart polkit 2>/dev/null || true
 else
-    rm -f "$SUDOERS_TMP"
-    echo -e "${ERR}✘ Nieprawidłowa składnia pliku sudoers – przerywam.${NC}" >&3
-    echo -e "${ERR}   Szczegóły visudo: ${VISUDO_ERR}${NC}" >&3
-    exit 1
+    SUDOERS_TMP="$(mktemp)"
+    printf '%s ALL=(ALL:ALL) NOPASSWD: ALL\n' "$CURRENT_USER" > "$SUDOERS_TMP"
+
+    if sudo visudo -cf "$SUDOERS_TMP"; then
+        sudo install -m 0440 -o root -g root "$SUDOERS_TMP" /etc/sudoers.d/99-temp-installer
+        rm -f "$SUDOERS_TMP"
+    else
+        rm -f "$SUDOERS_TMP"
+        echo -e "${ERR}✘ Nieprawidłowa składnia pliku sudoers – przerywam.${NC}" >&3
+        exit 1
+    fi
 fi
 
 printf '\033[?7l' >&3
@@ -534,7 +529,12 @@ if [[ -n "$ZSH_BIN" ]]; then
     fi
 fi
 
-sudo rm -f /etc/sudoers.d/99-temp-installer
+if [[ "$USE_RUN0" -eq 1 ]]; then
+    sudo rm -f "$RUN0_NOPASSWD_FILE"
+    sudo systemctl try-restart polkit 2>/dev/null || true
+else
+    sudo rm -f /etc/sudoers.d/99-temp-installer
+fi
 
 show_progress 12 $TOTAL_STEPS "$MSG_PHASE_3"
 echo -e "\n" >&3
