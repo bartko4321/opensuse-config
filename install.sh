@@ -5,6 +5,7 @@
 
 set -euo pipefail
 export ZYPPER_NONINTERACTIVE=1
+export PATH="/usr/sbin:/sbin:$PATH"
 
 detect_system_lang() {
     local sys_lang="${LANG:-}"
@@ -110,18 +111,41 @@ if [[ "$EUID" -eq 0 ]]; then
 fi
 
 printf '\033[?7h\n' >&3
+
+if [[ -z "$CURRENT_USER" ]]; then
+    echo -e "${ERR}✘ Nie udało się ustalić bieżącego użytkownika (whoami zwróciło pusty ciąg).${NC}" >&3
+    exit 1
+fi
+
+# Na części instalacji openSUSE Tumbleweed "sudo" to w rzeczywistości
+# run0-sudo (wrapper systemd na run0), który NIE zawiera visudo i nie
+# obsługuje "sudo -v". Upewniamy się, że mamy prawdziwy pakiet "sudo".
+if ! command -v visudo >/dev/null 2>&1 || sudo --version 2>/dev/null | grep -qi "run0"; then
+    echo -e "${WARN}⚠ Wykryto brak prawdziwego pakietu 'sudo' (używany jest wrapper run0). Instaluję pakiet 'sudo'...${NC}" >&3
+    sudo zypper install -y sudo
+    hash -r
+fi
+
+if ! command -v visudo >/dev/null 2>&1; then
+    echo -e "${ERR}✘ Nie udało się znaleźć/zainstalować 'visudo'. Zainstaluj ręcznie: sudo zypper install sudo${NC}" >&3
+    exit 1
+fi
+
 sudo -v
+
 SUDOERS_TMP="$(mktemp)"
-echo "$CURRENT_USER ALL=(ALL) NOPASSWD: ALL" > "$SUDOERS_TMP"
-chmod 0440 "$SUDOERS_TMP"
-if sudo visudo -cf "$SUDOERS_TMP" &>/dev/null; then
+printf '%s ALL=(ALL:ALL) NOPASSWD: ALL\n' "$CURRENT_USER" > "$SUDOERS_TMP"
+
+VISUDO_ERR="$(sudo visudo -cf "$SUDOERS_TMP" 2>&1)"
+if [[ $? -eq 0 ]]; then
     sudo install -m 0440 -o root -g root "$SUDOERS_TMP" /etc/sudoers.d/99-temp-installer
+    rm -f "$SUDOERS_TMP"
 else
     rm -f "$SUDOERS_TMP"
     echo -e "${ERR}✘ Nieprawidłowa składnia pliku sudoers – przerywam.${NC}" >&3
+    echo -e "${ERR}   Szczegóły visudo: ${VISUDO_ERR}${NC}" >&3
     exit 1
 fi
-rm -f "$SUDOERS_TMP"
 
 printf '\033[?7l' >&3
 
