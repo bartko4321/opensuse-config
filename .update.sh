@@ -50,6 +50,10 @@ if [ "$IS_PL" = true ]; then
     MSG_PURGE_KERNELS="==> Czyszczenie starych kerneli..."
     MSG_CLEAN_TMP="==> Czyszczenie /tmp i /var/tmp (starsze niż 3 dni)..."
     MSG_PHASE2_TITLE="   FAZA 2: UŻYTKOWNIK (BEZ SUDO)                      "
+    MSG_GNOME_EXT_UPDATE="==> Aktualizacja rozszerzeń GNOME Shell (gext)..."
+    MSG_GNOME_EXT_ABSENT="==> gext nieobecny w systemie - pomijam aktualizację rozszerzeń GNOME."
+    MSG_CINNAMON_EXT_UPDATE="==> Aktualizacja rozszerzeń/appletów/dekletów/motywów Cinnamon..."
+    MSG_CINNAMON_EXT_ABSENT="==> cinnamon-spice-updater nieobecny w systemie - pomijam aktualizację Cinnamon."
     MSG_FLATPAK_UPDATE_USER="==> Aktualizacja pakietów Flatpak użytkownika..."
     MSG_FLATPAK_CLEAN_USER="==> Kompleksowe czyszczenie Flatpak (Użytkownik)..."
     MSG_FLATPAK_CLEAN_VARAPP_USER="==> Czyszczenie osieroconych danych w ~/.var/app..."
@@ -97,6 +101,10 @@ else
     MSG_PURGE_KERNELS="==> Cleaning old kernels..."
     MSG_CLEAN_TMP="==> Cleaning /tmp and /var/tmp (older than 3 days)..."
     MSG_PHASE2_TITLE="   PHASE 2: USER (NO SUDO)                            "
+    MSG_GNOME_EXT_UPDATE="==> Updating GNOME Shell extensions (gext)..."
+    MSG_GNOME_EXT_ABSENT="==> gext not present on the system - skipping GNOME extensions update."
+    MSG_CINNAMON_EXT_UPDATE="==> Updating Cinnamon extensions/applets/desklets/themes..."
+    MSG_CINNAMON_EXT_ABSENT="==> cinnamon-spice-updater not present on the system - skipping Cinnamon update."
     MSG_FLATPAK_UPDATE_USER="==> Updating user Flatpak packages..."
     MSG_FLATPAK_CLEAN_USER="==> Comprehensive Flatpak cleanup (User)..."
     MSG_FLATPAK_CLEAN_VARAPP_USER="==> Cleaning orphaned data in ~/.var/app..."
@@ -245,6 +253,20 @@ sudo find /var/tmp -type f -atime +3 -delete 2>/dev/null
 echo -e "\n${BLUE}======================================================${NC}"
 echo -e "${BLUE}${MSG_PHASE2_TITLE}${NC}"
 echo -e "${BLUE}======================================================${NC}"
+
+if command -v gext &> /dev/null; then
+    echo -e "${GREEN}${MSG_GNOME_EXT_UPDATE}${NC}"
+    gext update
+else
+    echo -e "${YELLOW}${MSG_GNOME_EXT_ABSENT}${NC}"
+fi
+
+if command -v cinnamon-spice-updater &> /dev/null; then
+    echo -e "${GREEN}${MSG_CINNAMON_EXT_UPDATE}${NC}"
+    cinnamon-spice-updater --update-all
+else
+    echo -e "${YELLOW}${MSG_CINNAMON_EXT_ABSENT}${NC}"
+fi
 
 if command -v flatpak &> /dev/null; then
     echo -e "${GREEN}${MSG_FLATPAK_UPDATE_USER}${NC}"
