@@ -132,7 +132,7 @@ else
     SUDOERS_TMP="$(mktemp)"
     printf '%s ALL=(ALL:ALL) NOPASSWD: ALL\n' "$CURRENT_USER" > "$SUDOERS_TMP"
 
-    if sudo visudo -cf "$SUDOERS_TMP"; then
+    if sudo visudo -cf "$SUDOERS_TMP" &>/dev/null; then
         sudo install -m 0440 -o root -g root "$SUDOERS_TMP" /etc/sudoers.d/99-temp-installer
         rm -f "$SUDOERS_TMP"
     else
