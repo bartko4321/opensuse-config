@@ -1,4 +1,5 @@
 #!/bin/bash
+set -uo pipefail
 
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -6,217 +7,184 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-DETECTED_LOCALE="${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}"
-if [ -z "$DETECTED_LOCALE" ] && command -v locale &> /dev/null; then
-    DETECTED_LOCALE=$(locale 2>/dev/null | grep -m1 '^LANG=' | cut -d= -f2)
-fi
+detect_lang() {
+    local l="${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}"
+    if [ -z "$l" ] && command -v locale &> /dev/null; then
+        l=$(locale 2>/dev/null | grep -m1 '^LANG=' | cut -d= -f2)
+    fi
+    case "$l" in
+        pl_PL*|pl*) echo "pl" ;;
+        *) echo "en" ;;
+    esac
+}
+SCRIPT_LANG=$(detect_lang)
 
-if [[ "$DETECTED_LOCALE" == pl_PL* ]] || [[ "$DETECTED_LOCALE" == pl* ]]; then
-    IS_PL=true
-else
-    IS_PL=false
-fi
-
-if [ "$IS_PL" = true ]; then
+if [ "$SCRIPT_LANG" = "pl" ]; then
     MSG_TITLE="       KOMPLEKSOWY SKRYPT AKTUALIZACJI I CZYSZCZENIA  "
     MSG_ASK_PASS="Proszę podać hasło administratora (sudo):"
-    MSG_UNKNOWN_OS="Nieznany"
-    MSG_UNKNOWN_OS_WARN="Ostrzeżenie: Wykryto system inny niż Tumbleweed lub Leap. Zastosowana zostanie bezpieczna aktualizacja (up)."
-    MSG_PHASE1_TITLE="   FAZA 1: SYSTEM (SUDO)                              "
-    MSG_DUP_TUMBLEWEED="==> Wykryto openSUSE Tumbleweed. Wykonuję 'zypper dup'..."
-    MSG_UP_OTHER="==> Wykryto openSUSE \$OS_NAME. Wykonuję 'zypper up'..."
-    MSG_FWUPD_REFRESH="==> Odświeżanie metadanych firmware (fwupd)..."
-    MSG_FWUPD_UPDATE="==> Sprawdzanie i instalowanie aktualizacji firmware (fwupd)..."
-    MSG_FWUPD_ABSENT="==> fwupdmgr nieobecny w systemie - pomijam aktualizację firmware."
-    MSG_FWUPD_RESTART_NEEDED="UWAGA: Zainstalowano aktualizację firmware wymagającą restartu!"
-    MSG_CHECK_ORPHANS="==> Sprawdzanie osieroconych pakietów (orphans)..."
+    MSG_PHASE_UPDATE="[1/4] Aktualizacja systemu i aplikacji..."
+    MSG_PHASE_CLEAN_SYS="[2/4] Czyszczenie systemowe (sudo)..."
+    MSG_PHASE_CLEAN_USER="[3/4] Czyszczenie użytkownika..."
+    MSG_PHASE_RESTART="[4/4] Sprawdzanie konieczności restartu..."
+    MSG_DONE="AKTUALIZACJA I CZYSZCZENIE ZAKOŃCZONE!"
+    MSG_RESTART_WARN="UWAGA: Zalecany jest restart komputera (zaktualizowano kernel/firmware/kluczowe komponenty)."
+    MSG_NO_RESTART="Restart systemu nie jest aktualnie wymagany."
     MSG_FOUND_ORPHANS="Znaleziono potencjalnie nieużywane pakiety:"
-    MSG_ORPHAN_WARN1="UWAGA: Automatyczne usuwanie tych pakietów może uszkodzić system."
-    MSG_ORPHAN_WARN2="Przejrzyj listę i usuń ręcznie tylko te, które na pewno są zbędne:"
     MSG_ORPHAN_CONFIRM_PROMPT="Czy chcesz usunąć wszystkie powyższe pakiety? (wpisz 'TAK' aby potwierdzić): "
     MSG_ORPHAN_CONFIRM_WORD="TAK"
-    MSG_REMOVING_ORPHANS="==> Usuwanie osieroconych pakietów..."
-    MSG_SKIPPED_ORPHANS="==> Pominięto usuwanie osieroconych pakietów."
-    MSG_NO_ORPHANS="Brak osieroconych pakietów."
-    MSG_REMOVE_UNUSED_REPOS="==> Usuwanie nieużywanych repozytoriów Zypper..."
-    MSG_NO_INACTIVE_REPOS="Brak nieaktywnych repozytoriów."
-    MSG_CLEAN_ZYPPER_CACHE="==> Czyszczenie cache pobierania Zyppera..."
-    MSG_FLATPAK_UPDATE_SYS="==> Aktualizacja systemowych pakietów Flatpak..."
-    MSG_FLATPAK_CLEAN_SYS="==> Kompleksowe czyszczenie Flatpak (System)..."
-    MSG_FLATPAK_REMOVING_REMOTE_SYS="Usuwanie systemowego repozytorium Flatpak:"
-    MSG_FLATPAK_CLEAN_VARAPP_SYS="==> Czyszczenie osieroconych danych systemowych w /var/app..."
-    MSG_REMOVING="Usuwanie:"
-    MSG_CLEAN_LOGS="==> Czyszczenie starych logów (starsze niż 7 dni)..."
-    MSG_PURGE_KERNELS="==> Czyszczenie starych kerneli..."
-    MSG_CLEAN_TMP="==> Czyszczenie /tmp i /var/tmp (starsze niż 3 dni)..."
-    MSG_PHASE2_TITLE="   FAZA 2: UŻYTKOWNIK (BEZ SUDO)                      "
-    MSG_GNOME_EXT_UPDATE="==> Aktualizacja rozszerzeń GNOME Shell (gext)..."
-    MSG_GNOME_EXT_ABSENT="==> gext nieobecny w systemie - pomijam aktualizację rozszerzeń GNOME."
-    MSG_CINNAMON_EXT_UPDATE="==> Aktualizacja rozszerzeń/appletów/dekletów/motywów Cinnamon..."
-    MSG_CINNAMON_EXT_ABSENT="==> cinnamon-spice-updater nieobecny w systemie - pomijam aktualizację Cinnamon."
-    MSG_FLATPAK_UPDATE_USER="==> Aktualizacja pakietów Flatpak użytkownika..."
-    MSG_FLATPAK_CLEAN_USER="==> Kompleksowe czyszczenie Flatpak (Użytkownik)..."
-    MSG_FLATPAK_CLEAN_VARAPP_USER="==> Czyszczenie osieroconych danych w ~/.var/app..."
-    MSG_CLEAN_THUMBS="==> Czyszczenie starych miniatur (starsze niż 7 dni)..."
-    MSG_CLEAN_USER_CACHE="==> Czyszczenie starego cache użytkownika (omijanie przeglądarek)..."
-    MSG_CLEAN_VIRT="==> Czyszczenie virt-manager i reset historii ISO..."
-    MSG_REBUILD_FONTS="==> Odświeżanie cache czcionek..."
-    MSG_PHASE3_TITLE="   FAZA 3: SPRAWDZANIE STANU SYSTEMU                  "
-    MSG_CHECK_RESTART="==> Sprawdzanie konieczności restartu systemu (zypper ps)..."
-    MSG_RESTART_WARN1="UWAGA: Zaktualizowano kluczowe pakiety (np. kernel)!"
-    MSG_RESTART_WARN2=" ZALECANY JEST RESTART KOMPUTERA!                     "
-    MSG_NO_RESTART_NEEDED="==> Restart systemu nie jest aktualnie wymagany."
-    MSG_DONE_TITLE="       AKTUALIZACJA I CZYSZCZENIE ZAKOŃCZONE!          "
-    MSG_PRESS_ENTER="Naciśnij [ENTER], aby zakończyć..."
 else
     MSG_TITLE="         COMPREHENSIVE UPDATE AND CLEANUP SCRIPT       "
     MSG_ASK_PASS="Please enter the administrator (sudo) password:"
-    MSG_UNKNOWN_OS="Unknown"
-    MSG_UNKNOWN_OS_WARN="Warning: Detected a system other than Tumbleweed or Leap. A safe update (up) will be used."
-    MSG_PHASE1_TITLE="   PHASE 1: SYSTEM (SUDO)                             "
-    MSG_DUP_TUMBLEWEED="==> Detected openSUSE Tumbleweed. Running 'zypper dup'..."
-    MSG_UP_OTHER="==> Detected openSUSE \$OS_NAME. Running 'zypper up'..."
-    MSG_FWUPD_REFRESH="==> Refreshing firmware metadata (fwupd)..."
-    MSG_FWUPD_UPDATE="==> Checking for and installing firmware updates (fwupd)..."
-    MSG_FWUPD_ABSENT="==> fwupdmgr not present on the system - skipping firmware update."
-    MSG_FWUPD_RESTART_NEEDED="WARNING: A firmware update requiring a restart was installed!"
-    MSG_CHECK_ORPHANS="==> Checking for orphaned packages..."
+    MSG_PHASE_UPDATE="[1/4] Updating system and applications..."
+    MSG_PHASE_CLEAN_SYS="[2/4] System cleanup (sudo)..."
+    MSG_PHASE_CLEAN_USER="[3/4] User cleanup..."
+    MSG_PHASE_RESTART="[4/4] Checking if a restart is needed..."
+    MSG_DONE="UPDATE AND CLEANUP COMPLETE!"
+    MSG_RESTART_WARN="WARNING: A system restart is recommended (kernel/firmware/critical components were updated)."
+    MSG_NO_RESTART="A system restart is not currently required."
     MSG_FOUND_ORPHANS="Found potentially unused packages:"
-    MSG_ORPHAN_WARN1="WARNING: Automatically removing these packages could break the system."
-    MSG_ORPHAN_WARN2="Review the list and manually remove only those you're sure are unnecessary:"
     MSG_ORPHAN_CONFIRM_PROMPT="Do you want to remove all the packages above? (type 'YES' to confirm): "
     MSG_ORPHAN_CONFIRM_WORD="YES"
-    MSG_REMOVING_ORPHANS="==> Removing orphaned packages..."
-    MSG_SKIPPED_ORPHANS="==> Skipped removing orphaned packages."
-    MSG_NO_ORPHANS="No orphaned packages found."
-    MSG_REMOVE_UNUSED_REPOS="==> Removing unused Zypper repositories..."
-    MSG_NO_INACTIVE_REPOS="No inactive repositories found."
-    MSG_CLEAN_ZYPPER_CACHE="==> Cleaning the Zypper download cache..."
-    MSG_FLATPAK_UPDATE_SYS="==> Updating system Flatpak packages..."
-    MSG_FLATPAK_CLEAN_SYS="==> Comprehensive Flatpak cleanup (System)..."
-    MSG_FLATPAK_REMOVING_REMOTE_SYS="Removing system Flatpak remote:"
-    MSG_FLATPAK_CLEAN_VARAPP_SYS="==> Cleaning orphaned system data in /var/app..."
-    MSG_REMOVING="Removing:"
-    MSG_CLEAN_LOGS="==> Cleaning old logs (older than 7 days)..."
-    MSG_PURGE_KERNELS="==> Cleaning old kernels..."
-    MSG_CLEAN_TMP="==> Cleaning /tmp and /var/tmp (older than 3 days)..."
-    MSG_PHASE2_TITLE="   PHASE 2: USER (NO SUDO)                            "
-    MSG_GNOME_EXT_UPDATE="==> Updating GNOME Shell extensions (gext)..."
-    MSG_GNOME_EXT_ABSENT="==> gext not present on the system - skipping GNOME extensions update."
-    MSG_CINNAMON_EXT_UPDATE="==> Updating Cinnamon extensions/applets/desklets/themes..."
-    MSG_CINNAMON_EXT_ABSENT="==> cinnamon-spice-updater not present on the system - skipping Cinnamon update."
-    MSG_FLATPAK_UPDATE_USER="==> Updating user Flatpak packages..."
-    MSG_FLATPAK_CLEAN_USER="==> Comprehensive Flatpak cleanup (User)..."
-    MSG_FLATPAK_CLEAN_VARAPP_USER="==> Cleaning orphaned data in ~/.var/app..."
-    MSG_CLEAN_THUMBS="==> Cleaning old thumbnails (older than 7 days)..."
-    MSG_CLEAN_USER_CACHE="==> Cleaning old user cache (skipping browsers)..."
-    MSG_CLEAN_VIRT="==> Cleaning virt-manager and resetting ISO history..."
-    MSG_REBUILD_FONTS="==> Refreshing font cache..."
-    MSG_PHASE3_TITLE="   PHASE 3: CHECKING SYSTEM STATE                     "
-    MSG_CHECK_RESTART="==> Checking if a system restart is needed (zypper ps)..."
-    MSG_RESTART_WARN1="WARNING: Key packages have been updated (e.g. kernel)!"
-    MSG_RESTART_WARN2=" A SYSTEM RESTART IS RECOMMENDED!                     "
-    MSG_NO_RESTART_NEEDED="==> A system restart is not currently required."
-    MSG_DONE_TITLE="       UPDATE AND CLEANUP COMPLETE!                    "
-    MSG_PRESS_ENTER="Press [ENTER] to finish..."
 fi
 
-echo -e "${BLUE}======================================================${NC}"
-echo -e "${BLUE}${MSG_TITLE}${NC}"
-echo -e "${BLUE}======================================================${NC}"
+TMP_LOG="$(mktemp /tmp/update-log.XXXXXX)"
+LOG_FILE="$HOME/update_error_$(date +%Y%m%d_%H%M%S).log"
 
-echo -e "${YELLOW}${MSG_ASK_PASS}${NC}"
-sudo -v
+# fd 3 = real terminal (progress bar / final messages / interactive prompts).
+# stdout+stderr of everything else is redirected into the log file.
+exec 3>&1
+exec >>"$TMP_LOG" 2>&1
+
+cleanup_on_exit() {
+    local exit_code=$?
+    printf '\033[?25h' >&3
+    echo "" >&3
+    if [ "$exit_code" -ne 0 ]; then
+        cp -f "$TMP_LOG" "$LOG_FILE" 2>/dev/null || true
+        if [ "$SCRIPT_LANG" = "pl" ]; then
+            echo -e "${RED}✘ Wystąpił błąd (kod: $exit_code). Szczegółowy log zapisano w: $LOG_FILE${NC}" >&3
+        else
+            echo -e "${RED}✘ An error occurred (code: $exit_code). Detailed log saved to: $LOG_FILE${NC}" >&3
+        fi
+    fi
+    rm -f "$TMP_LOG"
+    kill "${SUDO_KEEP_ALIVE_PID:-}" 2>/dev/null
+}
+trap cleanup_on_exit EXIT
+
+show_progress() {
+    local step=$1
+    local total=$2
+    local msg=$3
+    local percent=$(( step * 100 / total ))
+
+    local cols
+    cols=$(tput cols 2>/dev/null)
+    [[ "$cols" =~ ^[0-9]+$ ]] || cols=80
+
+    local bar_width=50
+    local reserved=12
+    if (( cols - reserved < bar_width )); then
+        bar_width=$(( cols - reserved ))
+        (( bar_width < 10 )) && bar_width=10
+    fi
+
+    local overhead=$(( bar_width + reserved ))
+    local avail=$(( cols - overhead ))
+    if (( avail < 5 )); then avail=5; fi
+    if (( ${#msg} > avail )); then
+        msg="${msg:0:$((avail - 1))}…"
+    fi
+
+    local filled=$(( percent * bar_width / 100 ))
+    local empty=$(( bar_width - filled ))
+
+    local bar_filled=""
+    local bar_empty=""
+    if [ $filled -gt 0 ]; then printf -v bar_filled '%*s' "$filled" ''; bar_filled="${bar_filled// /#}"; fi
+    if [ $empty -gt 0 ]; then printf -v bar_empty '%*s' "$empty" ''; bar_empty="${bar_empty// /-}"; fi
+
+    printf "\r\033[K[\033[1;32m%s\033[0;90m%s\033[0m] %3d%% | \033[1;36m%s\033[0m" "$bar_filled" "$bar_empty" "$percent" "$msg" >&3
+}
+
+echo -e "${BLUE}======================================================${NC}" >&3
+echo -e "${BLUE}${MSG_TITLE}${NC}" >&3
+echo -e "${BLUE}======================================================${NC}" >&3
+echo -e "${YELLOW}${MSG_ASK_PASS}${NC}" >&3
+sudo -v >&3
 
 while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 SUDO_KEEP_ALIVE_PID=$!
-trap 'kill $SUDO_KEEP_ALIVE_PID 2>/dev/null' EXIT
 
 OS_ID=$(grep "^ID=" /etc/os-release | cut -d'=' -f2 | tr -d '"')
-
-if [ "$OS_ID" == "opensuse-tumbleweed" ]; then
+if [ "$OS_ID" = "opensuse-tumbleweed" ]; then
     OS_NAME="Tumbleweed"
-elif [ "$OS_ID" == "opensuse-leap" ]; then
+elif [ "$OS_ID" = "opensuse-leap" ]; then
     OS_NAME="Leap"
 else
-    OS_NAME="$MSG_UNKNOWN_OS ($OS_ID)"
-    echo -e "${YELLOW}${MSG_UNKNOWN_OS_WARN}${NC}"
+    OS_NAME="$OS_ID"
 fi
 
-echo -e "\n${BLUE}======================================================${NC}"
-echo -e "${BLUE}${MSG_PHASE1_TITLE}${NC}"
-echo -e "${BLUE}======================================================${NC}"
+REBOOT_NEEDED=false
+FWUPD_RESTART_NEEDED=false
+TOTAL_STEPS=18
+STEP=0
+show_progress $STEP $TOTAL_STEPS "$MSG_PHASE_UPDATE"
 
-if [ "$OS_NAME" == "Tumbleweed" ]; then
-    echo -e "${GREEN}${MSG_DUP_TUMBLEWEED}${NC}"
+# ---------------------------------------------------------------
+# PHASE: UPDATE
+# ---------------------------------------------------------------
+if [ "$OS_NAME" = "Tumbleweed" ]; then
     sudo zypper dup --no-allow-vendor-change --auto-agree-with-licenses
 else
-    echo -e "${GREEN}${MSG_UP_OTHER//\$OS_NAME/$OS_NAME}${NC}"
     sudo zypper up --auto-agree-with-licenses
 fi
+STEP=$((STEP+1)); show_progress $STEP $TOTAL_STEPS "$MSG_PHASE_UPDATE"
 
-FWUPD_RESTART_NEEDED=false
 if command -v fwupdmgr &> /dev/null; then
-    echo -e "${GREEN}${MSG_FWUPD_REFRESH}${NC}"
     sudo fwupdmgr refresh --force
-
-    echo -e "${GREEN}${MSG_FWUPD_UPDATE}${NC}"
     FWUPD_OUT=$(sudo fwupdmgr update -y 2>&1)
     echo "$FWUPD_OUT"
-
     if echo "$FWUPD_OUT" | grep -qiE "restart|reboot"; then
         FWUPD_RESTART_NEEDED=true
     fi
-else
-    echo -e "${YELLOW}${MSG_FWUPD_ABSENT}${NC}"
 fi
+STEP=$((STEP+1)); show_progress $STEP $TOTAL_STEPS "$MSG_PHASE_CLEAN_SYS"
 
-echo -e "${GREEN}${MSG_CHECK_ORPHANS}${NC}"
+# ---------------------------------------------------------------
+# PHASE: SYSTEM CLEANUP (SUDO)
+# ---------------------------------------------------------------
 ORPHANS=$(zypper packages --unneeded | awk -F'|' 'NR>4 {gsub(/ /, "", $3); print $3}' | grep -v '^$')
 if [ -n "$ORPHANS" ]; then
-    echo -e "${YELLOW}${MSG_FOUND_ORPHANS}${NC}"
-    echo "$ORPHANS" | nl -ba
-    echo ""
-    echo -e "${YELLOW}${MSG_ORPHAN_WARN1}${NC}"
-    echo -e "${YELLOW}${MSG_ORPHAN_WARN2}${NC}"
-    echo -e "${YELLOW}  sudo zypper rm NAZWA_PAKIETU${NC}"
-    echo ""
-    read -rp "$(echo -e "${YELLOW}${MSG_ORPHAN_CONFIRM_PROMPT}${NC}")" CONFIRM
-    if [ "$CONFIRM" == "$MSG_ORPHAN_CONFIRM_WORD" ]; then
-        echo -e "${GREEN}${MSG_REMOVING_ORPHANS}${NC}"
+    echo -e "${YELLOW}${MSG_FOUND_ORPHANS}${NC}" >&3
+    echo "$ORPHANS" | nl -ba >&3
+    echo "" >&3
+    printf "%b" "${YELLOW}${MSG_ORPHAN_CONFIRM_PROMPT}${NC}" >&3
+    read -r CONFIRM
+    if [ "$CONFIRM" = "$MSG_ORPHAN_CONFIRM_WORD" ]; then
         sudo zypper rm $ORPHANS
-    else
-        echo -e "${GREEN}${MSG_SKIPPED_ORPHANS}${NC}"
     fi
-else
-    echo "$MSG_NO_ORPHANS"
 fi
+STEP=$((STEP+1)); show_progress $STEP $TOTAL_STEPS "$MSG_PHASE_CLEAN_SYS"
 
-echo -e "${GREEN}${MSG_REMOVE_UNUSED_REPOS}${NC}"
 REPOS_TO_REMOVE=$(zypper lr | awk -F'|' '$4 ~ /No/ {print $2}' | xargs)
 if [ -n "$REPOS_TO_REMOVE" ]; then
     for repo in $REPOS_TO_REMOVE; do sudo zypper rr "$repo"; done
-else
-    echo "$MSG_NO_INACTIVE_REPOS"
 fi
+STEP=$((STEP+1)); show_progress $STEP $TOTAL_STEPS "$MSG_PHASE_CLEAN_SYS"
 
-echo -e "${GREEN}${MSG_CLEAN_ZYPPER_CACHE}${NC}"
 sudo zypper clean -a
+STEP=$((STEP+1)); show_progress $STEP $TOTAL_STEPS "$MSG_PHASE_CLEAN_SYS"
 
 if command -v flatpak &> /dev/null; then
-    echo -e "${GREEN}${MSG_FLATPAK_UPDATE_SYS}${NC}"
     sudo flatpak update --system -y
-
-    echo -e "${GREEN}${MSG_FLATPAK_CLEAN_SYS}${NC}"
     sudo flatpak uninstall --unused --system --delete-data -y
     sudo flatpak repair --system
 
     USED_REMOTES=$(flatpak list --system --columns=origin 2>/dev/null | sort -u)
     ALL_REMOTES=$(flatpak remotes --system --columns=name 2>/dev/null | tail -n +1)
-
     while IFS= read -r remote; do
         if [ -n "$remote" ] && ! echo "$USED_REMOTES" | grep -qx "$remote"; then
-            echo -e "${YELLOW}${MSG_FLATPAK_REMOVING_REMOTE_SYS} $remote${NC}"
             sudo flatpak remote-delete --system --force "$remote" 2>/dev/null
         fi
     done <<< "$ALL_REMOTES"
@@ -225,79 +193,68 @@ if command -v flatpak &> /dev/null; then
     sudo find /var/lib/flatpak -name "*.tmp" -delete 2>/dev/null
     sudo rm -f /var/lib/flatpak/history 2>/dev/null
 
-    echo -e "${GREEN}${MSG_FLATPAK_CLEAN_VARAPP_SYS}${NC}"
     INSTALLED_FLATPAKS=$(flatpak list --app --columns=application 2>/dev/null)
     if [ -d "/var/app" ]; then
         for app_dir in /var/app/*; do
             if [ -d "$app_dir" ]; then
                 app_id=$(basename "$app_dir")
                 if ! echo "$INSTALLED_FLATPAKS" | grep -qx "$app_id"; then
-                    echo -e "${YELLOW}${MSG_REMOVING} $app_id${NC}"
                     sudo rm -rf "$app_dir"
                 fi
             fi
         done
     fi
 fi
+STEP=$((STEP+1)); show_progress $STEP $TOTAL_STEPS "$MSG_PHASE_CLEAN_SYS"
 
-echo -e "${GREEN}${MSG_CLEAN_LOGS}${NC}"
 sudo journalctl --vacuum-time=7d
+STEP=$((STEP+1)); show_progress $STEP $TOTAL_STEPS "$MSG_PHASE_CLEAN_SYS"
 
-echo -e "${GREEN}${MSG_PURGE_KERNELS}${NC}"
 [ -f /sbin/purge-kernels ] && sudo /sbin/purge-kernels
+STEP=$((STEP+1)); show_progress $STEP $TOTAL_STEPS "$MSG_PHASE_CLEAN_SYS"
 
-echo -e "${GREEN}${MSG_CLEAN_TMP}${NC}"
 sudo find /tmp -type f -atime +3 -delete 2>/dev/null
 sudo find /var/tmp -type f -atime +3 -delete 2>/dev/null
+STEP=$((STEP+1)); show_progress $STEP $TOTAL_STEPS "$MSG_PHASE_CLEAN_USER"
 
-echo -e "\n${BLUE}======================================================${NC}"
-echo -e "${BLUE}${MSG_PHASE2_TITLE}${NC}"
-echo -e "${BLUE}======================================================${NC}"
-
+# ---------------------------------------------------------------
+# PHASE: USER CLEANUP
+# ---------------------------------------------------------------
 if command -v gext &> /dev/null; then
-    echo -e "${GREEN}${MSG_GNOME_EXT_UPDATE}${NC}"
     gext update
-else
-    echo -e "${YELLOW}${MSG_GNOME_EXT_ABSENT}${NC}"
 fi
+STEP=$((STEP+1)); show_progress $STEP $TOTAL_STEPS "$MSG_PHASE_CLEAN_USER"
 
 if command -v cinnamon-spice-updater &> /dev/null; then
-    echo -e "${GREEN}${MSG_CINNAMON_EXT_UPDATE}${NC}"
     cinnamon-spice-updater --update-all
-else
-    echo -e "${YELLOW}${MSG_CINNAMON_EXT_ABSENT}${NC}"
 fi
+STEP=$((STEP+1)); show_progress $STEP $TOTAL_STEPS "$MSG_PHASE_CLEAN_USER"
 
 if command -v flatpak &> /dev/null; then
-    echo -e "${GREEN}${MSG_FLATPAK_UPDATE_USER}${NC}"
     flatpak update --user -y
-
-    echo -e "${GREEN}${MSG_FLATPAK_CLEAN_USER}${NC}"
     flatpak uninstall --unused --user --delete-data -y
     flatpak repair --user
 
     rm -f ~/.local/share/flatpak/history 2>/dev/null
     rm -rf ~/.local/share/flatpak/repo/tmp/* 2>/dev/null
 
-    echo -e "${GREEN}${MSG_FLATPAK_CLEAN_VARAPP_USER}${NC}"
     INSTALLED_FLATPAKS=$(flatpak list --app --columns=application 2>/dev/null)
     if [ -d "$HOME/.var/app" ]; then
         for app_dir in "$HOME/.var/app"/*; do
             if [ -d "$app_dir" ]; then
                 app_id=$(basename "$app_dir")
                 if ! echo "$INSTALLED_FLATPAKS" | grep -qx "$app_id"; then
-                    echo -e "${YELLOW}${MSG_REMOVING} $app_id${NC}"
                     rm -rf "$app_dir"
                 fi
             fi
         done
     fi
 fi
+STEP=$((STEP+1)); show_progress $STEP $TOTAL_STEPS "$MSG_PHASE_CLEAN_USER"
 
-echo -e "${GREEN}${MSG_CLEAN_THUMBS}${NC}"
 find ~/.cache/thumbnails -type f -atime +7 -delete 2>/dev/null
+STEP=$((STEP+1)); show_progress $STEP $TOTAL_STEPS "$MSG_PHASE_CLEAN_USER"
 
-echo -e "${GREEN}${MSG_CLEAN_USER_CACHE}${NC}"
 find ~/.cache -type f -atime +14 \
     ! -path "*/mozilla/*" \
     ! -path "*/google-chrome/*" \
@@ -306,40 +263,36 @@ find ~/.cache -type f -atime +14 \
     ! -path "*/opera/*" \
     ! -path "*/vivaldi/*" \
     -delete 2>/dev/null
+STEP=$((STEP+1)); show_progress $STEP $TOTAL_STEPS "$MSG_PHASE_CLEAN_USER"
 
-echo -e "${GREEN}${MSG_CLEAN_VIRT}${NC}"
 USER_ID=$(id -u)
 if [ -S "/run/user/$USER_ID/bus" ]; then
     DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus" dconf reset /org/virt-manager/virt-manager/urls/isos 2>/dev/null
 fi
 rm -rf "$HOME/.cache/virt-manager" 2>/dev/null
+STEP=$((STEP+1)); show_progress $STEP $TOTAL_STEPS "$MSG_PHASE_RESTART"
 
-echo -e "${GREEN}${MSG_REBUILD_FONTS}${NC}"
 fc-cache -r
+STEP=$((STEP+1)); show_progress $STEP $TOTAL_STEPS "$MSG_PHASE_RESTART"
 
-echo -e "\n${BLUE}======================================================${NC}"
-echo -e "${BLUE}${MSG_PHASE3_TITLE}${NC}"
-echo -e "${BLUE}======================================================${NC}"
-
-echo -e "${GREEN}${MSG_CHECK_RESTART}${NC}"
+# ---------------------------------------------------------------
+# PHASE: RESTART CHECK
+# ---------------------------------------------------------------
 if sudo zypper ps 2>/dev/null | grep -iq "reboot is required"; then
-    echo -e "\n${RED}******************************************************${NC}"
-    echo -e "${RED} ${MSG_RESTART_WARN1} ${NC}"
-    echo -e "${YELLOW}${MSG_RESTART_WARN2}${NC}"
-    echo -e "${RED}******************************************************${NC}\n"
-else
-    echo -e "${GREEN}${MSG_NO_RESTART_NEEDED}${NC}"
+    REBOOT_NEEDED=true
 fi
-
 if [ "$FWUPD_RESTART_NEEDED" = true ]; then
-    echo -e "\n${RED}******************************************************${NC}"
-    echo -e "${RED} ${MSG_FWUPD_RESTART_NEEDED} ${NC}"
-    echo -e "${YELLOW}${MSG_RESTART_WARN2}${NC}"
-    echo -e "${RED}******************************************************${NC}\n"
+    REBOOT_NEEDED=true
 fi
+STEP=$((STEP+1)); show_progress $STEP $TOTAL_STEPS "$MSG_PHASE_RESTART"
 
-echo -e "\n${GREEN}======================================================${NC}"
-echo -e "${GREEN}${MSG_DONE_TITLE}${NC}"
-echo -e "${GREEN}======================================================${NC}"
-echo "$MSG_PRESS_ENTER"
-read -r
+echo -e "\n" >&3
+echo -e "${GREEN}======================================================${NC}" >&3
+echo -e "${GREEN}${MSG_DONE}${NC}" >&3
+echo -e "${GREEN}======================================================${NC}" >&3
+
+if [ "$REBOOT_NEEDED" = true ]; then
+    echo -e "${YELLOW}${MSG_RESTART_WARN}${NC}" >&3
+else
+    echo -e "${GREEN}${MSG_NO_RESTART}${NC}" >&3
+fi
