@@ -2,7 +2,7 @@ version = 1
 
 [global]
 dll = "~/.local/share/Steam/Lossless Scaling/Lossless.dll"
-
+ 
 [[game]]
 exe = "user"
 multiplier = 3
