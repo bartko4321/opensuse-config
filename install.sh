@@ -4,7 +4,7 @@
 # ==========================================================
 
 set -euo pipefail
-export ZYPPER_NONINTERACTIVE=1
+export ZYPPER_NONINTERACTIVE=1 
 export PATH="/usr/sbin:/sbin:$PATH"
 
 detect_system_lang() {
