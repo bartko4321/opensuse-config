@@ -32,6 +32,7 @@ if [ "$SCRIPT_LANG" = "pl" ]; then
     MSG_FOUND_ORPHANS="Znaleziono potencjalnie nieużywane pakiety:"
     MSG_ORPHAN_CONFIRM_PROMPT="Czy chcesz usunąć wszystkie powyższe pakiety? (wpisz 'TAK' aby potwierdzić): "
     MSG_ORPHAN_CONFIRM_WORD="TAK"
+    MSG_PRESS_ENTER="Naciśnij Enter, aby zamknąć okno..."
 else
     MSG_TITLE="         COMPREHENSIVE UPDATE AND CLEANUP SCRIPT       "
     MSG_ASK_PASS="Please enter the administrator (sudo) password:"
@@ -45,6 +46,7 @@ else
     MSG_FOUND_ORPHANS="Found potentially unused packages:"
     MSG_ORPHAN_CONFIRM_PROMPT="Do you want to remove all the packages above? (type 'YES' to confirm): "
     MSG_ORPHAN_CONFIRM_WORD="YES"
+    MSG_PRESS_ENTER="Press Enter to close this window..."
 fi
 
 TMP_LOG="$(mktemp /tmp/update-log.XXXXXX)"
@@ -291,6 +293,8 @@ echo -e "${GREEN}======================================================${NC}" >&
 
 if [ "$REBOOT_NEEDED" = true ]; then
     echo -e "${YELLOW}${MSG_RESTART_WARN}${NC}" >&3
+    echo -e "${YELLOW}${MSG_PRESS_ENTER}${NC}" >&3
+    read -r
 else
     echo -e "${GREEN}${MSG_NO_RESTART}${NC}" >&3
 fi
