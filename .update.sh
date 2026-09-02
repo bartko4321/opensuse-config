@@ -6,7 +6,7 @@ BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
-
+ 
 detect_lang() {
     local l="${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}"
     if [ -z "$l" ] && command -v locale &> /dev/null; then
