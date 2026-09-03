@@ -169,7 +169,7 @@ show_progress 1 $TOTAL_STEPS "$MSG_PHASE_1"
 sudo systemctl stop packagekit.service 2>/dev/null || true
 sudo killall -9 packagekitd 2>/dev/null || true
 
-for pkg in curl wget pciutils gpg2; do
+for pkg in curl wget pciutils gpg2 dconf; do
     sudo zypper install -y "$pkg" || true
 done
 
