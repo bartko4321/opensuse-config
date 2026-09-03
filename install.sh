@@ -512,11 +512,6 @@ flatpak install --user -y flathub it.mijorus.gearlever 2>/dev/null || true
 # ==========================================================
 show_progress 9 $TOTAL_STEPS "$MSG_PHASE_3"
 
-if [[ -d "$SCRIPT_DIR/bleachbit" ]]; then
-    sudo mkdir -p /root/.config/bleachbit
-    sudo cp -af "$SCRIPT_DIR/bleachbit/." /root/.config/bleachbit/
-fi
-
 sudo systemctl enable fstrim.timer || true
 sudo journalctl --vacuum-time=2d || true
 
