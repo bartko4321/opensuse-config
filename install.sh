@@ -209,14 +209,14 @@ sudo zypper dup -y --allow-vendor-change || true
 show_progress 3 $TOTAL_STEPS "$MSG_PHASE_1"
 
 TO_REMOVE=(
-    opensuse-welcome-launcher plasma-welcome
+    opensuse-welcome-launcher plasma-welcome 
     nano konqueror plasma-browser-integration plasma-vault
     plasma-thunderbolt kontact kmail kontrast krdp krfb
     kaddressbook kdepim-runtime akonadi-server akregator
-    epiphany decibels korganizer kwalletmanager
+    epiphany decibels korganizer kwalletmanager rhythmbox showtime
     gnome-calendar gnome-clocks gnome-user-docs gnome-contacts
     gnome-maps gnome-weather yelp evolution evolution-common
-    evolution-plugins evolution-ews
+    evolution-plugins evolution-ews parole gnome-music
 )
 for pkg in "${TO_REMOVE[@]}"; do
     if rpm -q "$pkg" &>/dev/null; then
@@ -265,7 +265,7 @@ PACKAGES=(
     dconf-editor fastfetch unrar git mc android-tools pv zenity innoextract
     audacity gimp gmic mixxx kdenlive kolourpaint soundconverter handbrake-gui
     telegram-desktop qbittorrent thunderbird MozillaThunderbird-translations-common
-    bleachbit makeself vim cdemu-daemon cdemu-client
+    bleachbit makeself vim cdemu-daemon cdemu-client elis dragonplayer
     gamemode gamescope mangohud goverlay libvkd3d1 wine-staging wine-mono wine-gecko
     cmake meson patterns-devel-base-devel_basis kernel-devel
     gstreamer-plugins-ugly
