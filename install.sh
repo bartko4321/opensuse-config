@@ -209,7 +209,7 @@ sudo zypper dup -y --allow-vendor-change || true
 show_progress 3 $TOTAL_STEPS "$MSG_PHASE_1"
 
 TO_REMOVE=(
-    opensuse-welcome-launcher plasma-welcome 
+    opensuse-welcome-launcher plasma-welcome dragonplayer elisa
     nano konqueror plasma-browser-integration plasma-vault
     plasma-thunderbolt kontact kmail kontrast krdp krfb
     kaddressbook kdepim-runtime akonadi-server akregator
@@ -265,10 +265,10 @@ PACKAGES=(
     dconf-editor fastfetch unrar git mc android-tools pv zenity innoextract
     audacity gimp gmic mixxx kdenlive kolourpaint soundconverter handbrake-gui
     telegram-desktop qbittorrent thunderbird MozillaThunderbird-translations-common
-    bleachbit makeself vim cdemu-daemon cdemu-client elis dragonplayer
+    bleachbit makeself vim cdemu-daemon cdemu-client vlc vlc-codecs
     gamemode gamescope mangohud goverlay libvkd3d1 wine-staging wine-mono wine-gecko
     cmake meson patterns-devel-base-devel_basis kernel-devel
-    gstreamer-plugins-ugly
+    gstreamer-plugins-ugly qmmp qmmp-plugin-pack 
     zsh
 )
 
