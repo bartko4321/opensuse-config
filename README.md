@@ -42,7 +42,7 @@ Installs and configures `virt-manager`/QEMU/libvirt with a default NAT network a
 
 1. Clone the repository or download the files
 ```bash
-git clone https://gitlab.com/syscore88/opensuse-config.git
+git clone https://github.com/syscore88/opensuse-config.git
 ```
 
 2. Enter the downloaded folder
