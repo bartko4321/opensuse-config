@@ -55,9 +55,8 @@ cd opensuse-config
 chmod +x install.sh
 ```
 
-### 4. Run the script
-> ⚠️ **IMPORTANT:** Run the script as a **regular user** (NOT as root/sudo), on a fresh **openSUSE Tumbleweed** installation. It will ask for the administrator password once at the start to configure temporary elevated privileges, and will ask at the end whether to reboot.
-
+4. Run the script
+⚠️ **IMPORTANT:** Run the script as a **regular user** (NOT as root/sudo), on a fresh **openSUSE Tumbleweed** installation. It will ask for the administrator password once at the start to configure temporary elevated privileges, and will ask at the end whether to reboot.
 ```bash
 ./install.sh
 ```
