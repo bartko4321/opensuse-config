@@ -23,14 +23,14 @@ if [ "$SCRIPT_LANG" = "pl" ]; then
     MSG_TITLE="       KOMPLEKSOWY SKRYPT AKTUALIZACJI I CZYSZCZENIA  "
     MSG_ASK_PASS="Proszę podać hasło administratora (sudo):"
     MSG_PHASE_UPDATE="[1/4] Aktualizacja systemu i aplikacji..."
+    MSG_PACKAGES_LIST="Pakiety do aktualizacji:"
+    MSG_NO_PACKAGES="Brak pakietów do aktualizacji."
     MSG_PHASE_CLEAN_SYS="[2/4] Czyszczenie systemowe (sudo)..."
     MSG_PHASE_CLEAN_USER="[3/4] Czyszczenie użytkownika..."
     MSG_PHASE_RESTART="[4/4] Sprawdzanie konieczności restartu..."
     MSG_DONE="AKTUALIZACJA I CZYSZCZENIE ZAKOŃCZONE!"
     MSG_RESTART_WARN="UWAGA: Zalecany jest restart komputera."
     MSG_NO_RESTART="Restart systemu nie jest aktualnie wymagany."
-    MSG_PACKAGES_LIST="Pakiety do aktualizacji:"
-    MSG_NO_PACKAGES="Brak pakietów do aktualizacji."
     MSG_FOUND_ORPHANS="Znaleziono potencjalnie nieużywane pakiety:"
     MSG_ORPHAN_CONFIRM_PROMPT="Czy chcesz usunąć wszystkie powyższe pakiety? (wpisz 'TAK' aby potwierdzić): "
     MSG_ORPHAN_CONFIRM_WORD="TAK"
@@ -39,14 +39,14 @@ else
     MSG_TITLE="         COMPREHENSIVE UPDATE AND CLEANUP SCRIPT       "
     MSG_ASK_PASS="Please enter the administrator (sudo) password:"
     MSG_PHASE_UPDATE="[1/4] Updating system and applications..."
+    MSG_PACKAGES_LIST="Packages to be updated:"
+    MSG_NO_PACKAGES="No packages to update."
     MSG_PHASE_CLEAN_SYS="[2/4] System cleanup (sudo)..."
     MSG_PHASE_CLEAN_USER="[3/4] User cleanup..."
     MSG_PHASE_RESTART="[4/4] Checking if a restart is needed..."
     MSG_DONE="UPDATE AND CLEANUP COMPLETE!"
     MSG_RESTART_WARN="WARNING: A system restart is recommended"
     MSG_NO_RESTART="A system restart is not currently required."
-    MSG_PACKAGES_LIST="Packages to be updated:"
-    MSG_NO_PACKAGES="No packages to update."
     MSG_FOUND_ORPHANS="Found potentially unused packages:"
     MSG_ORPHAN_CONFIRM_PROMPT="Do you want to remove all the packages above? (type 'YES' to confirm): "
     MSG_ORPHAN_CONFIRM_WORD="YES"
@@ -139,23 +139,28 @@ show_progress $STEP $TOTAL_STEPS "$MSG_PHASE_UPDATE"
 # PHASE: UPDATE
 # ---------------------------------------------------------------
 if [ "$OS_NAME" = "Tumbleweed" ]; then
-    ZYPPER_OUT=$(sudo env LC_ALL=C zypper --non-interactive dup --no-allow-vendor-change --auto-agree-with-licenses 2>&1)
+    ZYPPER_OUT=$(sudo env LC_ALL=C zypper --non-interactive dup --details --no-allow-vendor-change --auto-agree-with-licenses 2>&1)
 else
-    ZYPPER_OUT=$(sudo env LC_ALL=C zypper --non-interactive up --auto-agree-with-licenses 2>&1)
+    ZYPPER_OUT=$(sudo env LC_ALL=C zypper --non-interactive up --details --auto-agree-with-licenses 2>&1)
 fi
 echo "$ZYPPER_OUT"
 
-# Extract just the package names from the "The following ... packages are
-# going to be ..." blocks that zypper prints (upgraded/installed/removed/etc.)
+# With --details, each package inside the "The following ... " block is
+# printed on its own line already including old -> new version info, so we
+# keep whole trimmed lines instead of splitting on whitespace.
 UPDATED_PACKAGES=$(echo "$ZYPPER_OUT" | awk '
     /^The following/ {flag=1; next}
     /^$/ {flag=0}
-    flag {print}
-' | tr -s ' \t' '\n' | sed '/^$/d' | sort -u)
+    flag {
+        line=$0
+        gsub(/^[ \t]+|[ \t]+$/, "", line)
+        if (line != "") print line
+    }
+' | sort -u)
 
 if [ -n "$UPDATED_PACKAGES" ]; then
     echo -e "${BLUE}${MSG_PACKAGES_LIST}${NC}" >&3
-    echo "$UPDATED_PACKAGES" | column >&3 2>/dev/null || echo "$UPDATED_PACKAGES" >&3
+    echo "$UPDATED_PACKAGES" >&3
 else
     echo -e "${BLUE}${MSG_NO_PACKAGES}${NC}" >&3
 fi
