@@ -355,8 +355,8 @@ echo -e "${GREEN}======================================================${NC}" >&
 
 if [ "$REBOOT_NEEDED" = true ]; then
     echo -e "${YELLOW}${MSG_RESTART_WARN}${NC}" >&3
-    echo -e "${YELLOW}${MSG_PRESS_ENTER}${NC}" >&3
-    read -r
 else
     echo -e "${GREEN}${MSG_NO_RESTART}${NC}" >&3
 fi
+echo -e "${YELLOW}${MSG_PRESS_ENTER}${NC}" >&3
+read -r
