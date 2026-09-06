@@ -29,6 +29,8 @@ if [ "$SCRIPT_LANG" = "pl" ]; then
     MSG_DONE="AKTUALIZACJA I CZYSZCZENIE ZAKOŃCZONE!"
     MSG_RESTART_WARN="UWAGA: Zalecany jest restart komputera."
     MSG_NO_RESTART="Restart systemu nie jest aktualnie wymagany."
+    MSG_PACKAGES_LIST="Pakiety do aktualizacji:"
+    MSG_NO_PACKAGES="Brak pakietów do aktualizacji."
     MSG_FOUND_ORPHANS="Znaleziono potencjalnie nieużywane pakiety:"
     MSG_ORPHAN_CONFIRM_PROMPT="Czy chcesz usunąć wszystkie powyższe pakiety? (wpisz 'TAK' aby potwierdzić): "
     MSG_ORPHAN_CONFIRM_WORD="TAK"
@@ -43,6 +45,8 @@ else
     MSG_DONE="UPDATE AND CLEANUP COMPLETE!"
     MSG_RESTART_WARN="WARNING: A system restart is recommended"
     MSG_NO_RESTART="A system restart is not currently required."
+    MSG_PACKAGES_LIST="Packages to be updated:"
+    MSG_NO_PACKAGES="No packages to update."
     MSG_FOUND_ORPHANS="Found potentially unused packages:"
     MSG_ORPHAN_CONFIRM_PROMPT="Do you want to remove all the packages above? (type 'YES' to confirm): "
     MSG_ORPHAN_CONFIRM_WORD="YES"
@@ -135,10 +139,28 @@ show_progress $STEP $TOTAL_STEPS "$MSG_PHASE_UPDATE"
 # PHASE: UPDATE
 # ---------------------------------------------------------------
 if [ "$OS_NAME" = "Tumbleweed" ]; then
-    sudo zypper dup --no-allow-vendor-change --auto-agree-with-licenses
+    ZYPPER_OUT=$(sudo env LC_ALL=C zypper --non-interactive dup --no-allow-vendor-change --auto-agree-with-licenses 2>&1)
 else
-    sudo zypper up --auto-agree-with-licenses
+    ZYPPER_OUT=$(sudo env LC_ALL=C zypper --non-interactive up --auto-agree-with-licenses 2>&1)
 fi
+echo "$ZYPPER_OUT"
+
+# Extract just the package names from the "The following ... packages are
+# going to be ..." blocks that zypper prints (upgraded/installed/removed/etc.)
+UPDATED_PACKAGES=$(echo "$ZYPPER_OUT" | awk '
+    /^The following/ {flag=1; next}
+    /^$/ {flag=0}
+    flag {print}
+' | tr -s ' \t' '\n' | sed '/^$/d' | sort -u)
+
+if [ -n "$UPDATED_PACKAGES" ]; then
+    echo -e "${BLUE}${MSG_PACKAGES_LIST}${NC}" >&3
+    echo "$UPDATED_PACKAGES" | column >&3 2>/dev/null || echo "$UPDATED_PACKAGES" >&3
+else
+    echo -e "${BLUE}${MSG_NO_PACKAGES}${NC}" >&3
+fi
+echo "" >&3
+
 STEP=$((STEP+1)); show_progress $STEP $TOTAL_STEPS "$MSG_PHASE_UPDATE"
 
 if command -v fwupdmgr &> /dev/null; then
